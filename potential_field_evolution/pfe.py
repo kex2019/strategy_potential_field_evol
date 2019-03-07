@@ -1,5 +1,6 @@
 import robotic_warehouse.robotic_warehouse as warehouse
 import robotic_warehouse_utils.data_collection as data_collection
+import potential_field_evolution.naviagtion as navigation
 import kex_robot.robot as KR
 import pandas as pd
 import random
@@ -8,34 +9,24 @@ import queue
 
 
 class PFE():
-    def __init__(self, robots, gym, capacity: int, num_robots: int):
+    def __init__(self, 
+            robots, 
+            gym, 
+            capacity: int, 
+            num_robots: int):
         self.gym = gym
         self.capacity = capacity
         self.num_robots = num_robots
-        self.idle_positions = []
+
         self.tags = set()
         self.robots = []
         for i in range(num_robots):
-            self.robots.append(
-                KR.Robot(robots[i], gym.gym, capacity, self.tags, self.robots))
+            robot = KR.Robot(robots[i], gym.gym, capacity, self.tags,
+                             self.robots)
+            """ Inject robots model of the world. """
+            robot.model = navigation.build_map_model(robot)
 
-        self.distribute_robots(0, 0, self.gym.gym.map_width,
-                               self.gym.gym.map_height)
-
-    def distribute_robots(self, x0, y0, x1, y1):
-        q = queue.Queue()
-        q.put((x0, x1, y0, y1))
-        while True:
-            if len(self.idle_positions) >= self.num_robots:
-                return
-            (x0, x1, y0, y1) = q.get()
-            x = (x0 + x1) // 2
-            y = (y0 + y1) // 2
-            self.idle_positions.append(self.robots[0].walkable_near((y, x)))
-            q.put((x0, x, y0, y))
-            q.put((x0, x, y, y1))
-            q.put((x, x1, y0, y))
-            q.put((x, x1, y, y1))
+            self.robots.append(robot)
 
     def gc_tags(self, packages):
         self.tags = self.tags.intersection(set(packages))
@@ -47,8 +38,7 @@ class PFE():
         instructions = []
         for i, robot in enumerate(self.robots):
             robot.reservations = self.tags
-            instructions.append(
-                robot(packages, lambda _: self.idle_positions[i]))
+            instructions.append(robot(packages, navigation.navigate))
 
         return instructions
 
