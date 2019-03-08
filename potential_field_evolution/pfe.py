@@ -1,6 +1,8 @@
 import robotic_warehouse.robotic_warehouse as warehouse
 import robotic_warehouse_utils.data_collection as data_collection
 import potential_field_evolution.naviagtion as navigation
+import potential_field_evolution.evolution as evolution
+import potential_field_evolution.initialization as initialization
 import kex_robot.robot as KR
 import pandas as pd
 import random
@@ -9,14 +11,12 @@ import queue
 
 
 class PFE():
-    def __init__(self, 
-            robots, 
-            gym, 
-            capacity: int, 
-            num_robots: int):
+    def __init__(self, robots, gym, capacity: int, num_robots: int,
+                 generation_steps: int):
         self.gym = gym
         self.capacity = capacity
         self.num_robots = num_robots
+        self.generation_steps = generation_steps
 
         self.tags = set()
         self.robots = []
@@ -24,9 +24,11 @@ class PFE():
             robot = KR.Robot(robots[i], gym.gym, capacity, self.tags,
                              self.robots)
             """ Inject robots model of the world. """
-            robot.model = navigation.build_map_model(robot)
+            robot.model = initialization.build_map_model(robot)
 
             self.robots.append(robot)
+
+        self.steps = 1
 
     def gc_tags(self, packages):
         self.tags = self.tags.intersection(set(packages))
@@ -34,6 +36,11 @@ class PFE():
     def __call__(self, packages) -> "instructions":
         """ Maybe dont do this each time?"""
         self.gc_tags(packages)
+
+        if self.steps % self.generation_steps == 0:
+            evolution.evolve(self.robots)
+
+        self.steps += 1
 
         instructions = []
         for i, robot in enumerate(self.robots):
@@ -124,8 +131,12 @@ def evaluate(**kwargs):
     gym = data_collection.initGymCollect(gym, data, output, name, steps,
                                          collect)
 
+    generation_steps = 200
+    if "generation_steps" in kwargs:
+        generation_steps = kwargs["generation_steps"]
+
     R, packages = gym.reset()
-    swarm = PFE(R, gym, capacity, robots)
+    swarm = PFE(R, gym, capacity, robots, generation_steps)
 
     render = False
     if "render" in kwargs:
