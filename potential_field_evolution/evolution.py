@@ -22,8 +22,6 @@ def evolve(robots):
     """ Ranking... """
     robots = sorted(robots, key=lambda r: r.fitness, reverse=True)
 
-    print()
-    print(robots[0].fitness)
     """ Selection """
     masters = robots[:int(len(robots) * 0.5 + 0.5)]
     apprentices = robots[int(len(robots) * 0.5 + 0.5):]
